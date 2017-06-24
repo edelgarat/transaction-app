@@ -8,40 +8,50 @@ import * as MDL from "react-mdl";
 import 'react-mdl/extra/material.js';
 import transactions from './transactionList';
 
-const { DataTable, TableHeader, Button, Textfield,Menu,MenuItem } = MDL;
+const { DataTable, TableHeader, Button, Textfield, Menu, MenuItem,Spinner } = MDL;
 /*
 добавление фильтра:
     добавить кнопку
     добавить редьюсер
     обработать редьюсер в BtnRedux
 */
-function generalReducer(store = { filters: { up: { val: false }, down: { val: false }, over1000: { val: false }, month: { val: false } }, transactions: [] }, action) {
+function generalReducer(store = { loadingSpinner: { val: false }, filters: { up: { val: false }, down: { val: false }, over1000: { val: false }, month: { val: false } }, transactions: [] }, action) {
     switch (action.type) {
         case "ADD": {
             let ret = {
                 filters: store.filters,
-                transactions: [...store.transactions, Object.assign({}, store.transactions, action.item)]
+                transactions: [...store.transactions, Object.assign({}, store.transactions, action.item)],
+                loadingSpinner:store.loadingSpinner
             };
             return ret;
         }
         case "FILTER:UP": {
             let ret = { filters: { ...store.filters }, transactions: store.transactions };
+            ret.loadingSpinner = store.loadingSpinner;
             ret.filters.up.val = !ret.filters.up.val;
             return ret;
         }
         case "FILTER:DOWN": {
             let ret = { filters: { ...store.filters }, transactions: store.transactions };
+            ret.loadingSpinner = store.loadingSpinner;
             ret.filters.down.val = !ret.filters.down.val;
             return ret;
         }
         case "FILTER:MONTH": {
             let ret = { filters: { ...store.filters }, transactions: store.transactions };
+            ret.loadingSpinner = store.loadingSpinner;
             ret.filters.month.val = !ret.filters.month.val;
             return ret;
         }
         case "FILTER:OVER1000": {
             let ret = { filters: { ...store.filters }, transactions: store.transactions };
+            ret.loadingSpinner = store.loadingSpinner;
             ret.filters.over1000.val = !ret.filters.over1000.val;
+            return ret;
+        }
+        case "SET_LOADING_SPINNER": {
+            let ret = { filters: store.filters, transactions: store.transactions };
+            ret.loadingSpinner = { val: action.enable }
             return ret;
         }
         default: return store;
@@ -106,7 +116,7 @@ transactions.forEach(tr => generalStore.dispatch({ type: "ADD", item: tr }));
 class AppAdd extends React.Component {
     constructor() {
         super();
-        this.state = { type: "plus"}
+        this.state = { type: "plus" }
         this.send = this.send.bind(this);
     }
     send() {
@@ -114,21 +124,22 @@ class AppAdd extends React.Component {
     }
     render() {
         return <div>
-            <Button raised ripple id="demo-menu-lower-left">Тип: {this.state.type==="plus"?"Пополнение":"Вывод"}</Button>
+            <Button raised ripple id="demo-menu-lower-left">Тип: {this.state.type === "plus" ? "Пополнение" : "Вывод"}</Button>
             <Menu target="demo-menu-lower-left">
-                <MenuItem onClick={()=>this.setState({type:"plus"})}>Пополнить</MenuItem>
-                <MenuItem onClick={()=>this.setState({type:"minus"})}>Снять</MenuItem>
+                <MenuItem onClick={() => this.setState({ type: "plus" })}>Пополнить</MenuItem>
+                <MenuItem onClick={() => this.setState({ type: "minus" })}>Снять</MenuItem>
             </Menu>
             <Textfield ref={(input) => this.valueInput = input} pattern="-?[0-9]*(\.[0-9]+)?" error="Введите число" label="Value" />
-            <Button raised colored onClick={ this.send}>Отправить</Button>
+            {this.props.loadingSpinner.val?<Spinner />:<Button raised colored onClick={this.send}>Отправить</Button>}
         </div>
     }
 }
 let AppAddRedux = connect(
-    store => store,
+    store => ({loadingSpinner:store.loadingSpinner}),
     dispatch => ({
         add: (value, type) => {
             dispatch(newDispatch => {
+                newDispatch({ type: "SET_LOADING_SPINNER", enable: true });
                 setTimeout(() => {
                     /*******FROM SERVER*/
                     let status = "OK";
@@ -136,8 +147,9 @@ let AppAddRedux = connect(
                     let date = +new Date();
                     /********/
                     if (status === "OK") {
-                        newDispatch({ type: "ADD", item: { id: _id, value, type, date },endSpinner:true }); 
-                    }
+                        newDispatch({ type: "ADD", item: { id: _id, value, type, date }, endSpinner: true });
+                        newDispatch({ type: "SET_LOADING_SPINNER", enable: false });
+                 }
                 }, 2000);//XHR либо Fetch
             });
         }
